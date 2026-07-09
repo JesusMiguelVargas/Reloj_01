@@ -10,7 +10,7 @@ import {
   SoundOffIcon,
   SoundOnIcon,
 } from './components/Icons';
-import { AMBIENT_LABELS, useAmbient, type Ambient } from './hooks/useAmbient';
+import { EMPTY_MIX, MIX_LABELS, useAmbient, type AmbientMix } from './hooks/useAmbient';
 import { useClock } from './hooks/useClock';
 import { DEFAULT_POMODORO, usePomodoro, type PomodoroConfig } from './hooks/usePomodoro';
 import { useSound } from './hooks/useSound';
@@ -56,7 +56,8 @@ interface Settings {
   notify: boolean;
   hour12: boolean;
   theme: Theme;
-  ambient: Ambient;
+  ambientMix: AmbientMix;
+  breathing: boolean;
   pomodoro: PomodoroConfig;
   flipStyle: 'suave' | 'mecanico' | 'instantaneo';
   flipSpeed: 'lenta' | 'normal' | 'rapida';
@@ -76,7 +77,8 @@ const DEFAULT_SETTINGS: Settings = {
   notify: false,
   hour12: false,
   theme: 'negro',
-  ambient: 'none',
+  ambientMix: EMPTY_MIX,
+  breathing: true,
   pomodoro: DEFAULT_POMODORO,
   flipStyle: 'suave',
   flipSpeed: 'normal',
@@ -113,9 +115,16 @@ function loadSettings(): Settings {
     const raw = localStorage.getItem('reloj:settings');
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Migración: la versión anterior guardaba un solo ambiente ('rain'…)
+      let ambientMix: AmbientMix = { ...EMPTY_MIX, ...(parsed.ambientMix ?? {}) };
+      if (!parsed.ambientMix && parsed.ambient && parsed.ambient !== 'none') {
+        const key = (['rain', 'noise', 'tick'] as const).find((k) => k === parsed.ambient);
+        if (key) ambientMix = { ...EMPTY_MIX, [key]: 0.7 };
+      }
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        ambientMix,
         pomodoro: { ...DEFAULT_POMODORO, ...(parsed.pomodoro ?? {}) },
       };
     }
@@ -155,7 +164,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>(loadMode);
 
   const { playFlick, playAlarm, playChime, playDong, unlock } = useSound();
-  const { start: startAmbient, stop: stopAmbient } = useAmbient();
+  const { apply: applyAmbient } = useAmbient();
   const [stats, setStats] = useState(todayStats);
   const timerDurationRef = useRef(0);
 
@@ -393,14 +402,10 @@ export default function App() {
         : stopwatch.running;
   const finished = mode === 'timer' && timer.status === 'finished';
 
-  // Sonido ambiente: solo mientras corre la cuenta.
+  // Sonido ambiente: solo mientras corre la cuenta, con fundido de salida.
   useEffect(() => {
-    if (running && settings.ambient !== 'none') {
-      startAmbient(settings.ambient);
-    } else {
-      stopAmbient();
-    }
-  }, [running, settings.ambient, startAmbient, stopAmbient]);
+    applyAmbient(settings.ambientMix, running);
+  }, [running, settings.ambientMix, applyAmbient]);
 
   // Anti burn-in: desplaza el reloj unos píxeles de vez en cuando.
   const [drift, setDrift] = useState({ x: 0, y: 0 });
@@ -459,6 +464,10 @@ export default function App() {
 
   const controlsHidden = mode === 'clock';
 
+  // Respiración guiada: sustituye a los dígitos durante los descansos.
+  const breathing =
+    settings.breathing && mode === 'pomodoro' && pomodoro.running && pomodoro.phase !== 'focus';
+
   return (
     <div
       className={`app${finished ? ' finished' : ''}${night ? ' night' : ''}`}
@@ -481,7 +490,9 @@ export default function App() {
             onClick={() => setShowSound(true)}
             aria-label="Sonido"
           >
-            {settings.alarmSound || settings.ambient !== 'none' ? (
+            {settings.alarmSound ||
+            settings.ambientMix.rain + settings.ambientMix.noise + settings.ambientMix.tick >
+              0.01 ? (
               <SoundOnIcon />
             ) : (
               <SoundOffIcon />
@@ -514,7 +525,7 @@ export default function App() {
       </nav>
 
       <main
-        className="clock"
+        className={`clock${breathing ? ' breathing' : ''}`}
         role="timer"
         aria-label={`${digits[0]}${digits[1]} ${digits[2]}${digits[3]}`}
         onPointerDown={onClockPointerDown}
@@ -523,9 +534,19 @@ export default function App() {
         onPointerCancel={onClockPointerUp}
         style={{ transform: `translate(${drift.x}px, ${drift.y}px)`, transition: 'transform 2s ease' }}
       >
-        {digits.map((d, i) => (
-          <FlipDigit key={i} value={d} durationMs={flipDurationMs} />
-        ))}
+        {breathing ? (
+          <div className="breath">
+            <div className="breath-circle" />
+            <span className="breath-label">Respira</span>
+            <span className="breath-time">
+              {digits[0]}
+              {digits[1]}:{digits[2]}
+              {digits[3]}
+            </span>
+          </div>
+        ) : (
+          digits.map((d, i) => <FlipDigit key={i} value={d} durationMs={flipDurationMs} />)
+        )}
       </main>
 
       {mode === 'pomodoro' && (
@@ -676,21 +697,23 @@ export default function App() {
                 }}
               />
             </label>
-            <h3 className="sheet-subtitle">Ambiente mientras corre</h3>
-            <div className="presets ambient-grid">
-              {(Object.keys(AMBIENT_LABELS) as Ambient[]).map((a) => (
-                <button
-                  key={a}
-                  className={`preset${settings.ambient === a ? ' active' : ''}`}
-                  onClick={() => {
+            <h3 className="sheet-subtitle">Mezclador de ambiente (mientras corre)</h3>
+            {(Object.keys(MIX_LABELS) as (keyof AmbientMix)[]).map((k) => (
+              <label className="mix-row" key={k}>
+                <span>{MIX_LABELS[k]}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(settings.ambientMix[k] * 100)}
+                  onChange={(e) => {
                     unlock();
-                    setSettings((s) => ({ ...s, ambient: a }));
+                    const v = Number(e.target.value) / 100;
+                    setSettings((s) => ({ ...s, ambientMix: { ...s.ambientMix, [k]: v } }));
                   }}
-                >
-                  {AMBIENT_LABELS[a]}
-                </button>
-              ))}
-            </div>
+                />
+              </label>
+            ))}
             <button className="sheet-primary" onClick={() => setShowSound(false)}>
               Listo
             </button>
@@ -776,6 +799,14 @@ export default function App() {
               ))}
             </div>
 
+            <label className="toggle-row">
+              <span>Respiración guiada en descansos</span>
+              <input
+                type="checkbox"
+                checked={settings.breathing}
+                onChange={(e) => setSettings((s) => ({ ...s, breathing: e.target.checked }))}
+              />
+            </label>
             <label className="toggle-row">
               <span>Atenuación nocturna (21:00–07:00)</span>
               <input

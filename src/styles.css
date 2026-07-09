@@ -463,8 +463,92 @@ body {
   }
 }
 
-.ambient-grid {
-  grid-template-columns: repeat(4, 1fr);
+.mix-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 15px;
+  color: var(--sheet-text);
+  padding: 4px 2px;
+}
+
+.mix-row input[type='range'] {
+  flex: 1;
+  max-width: 220px;
+  accent-color: var(--accent);
+}
+
+/* ---------- Respiración guiada ---------- */
+
+.clock.breathing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 3vmin, 28px);
+}
+
+.breath {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2.4vmin, 22px);
+}
+
+.breath-circle {
+  /* margen extra para el crecimiento de la animación (escala 1.32) */
+  margin: clamp(24px, 7vmin, 60px);
+  width: clamp(120px, 38vmin, 300px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--digit);
+  box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.06);
+  animation: breathe 10s ease-in-out infinite;
+}
+
+/* Inhala 4 s, sostiene 1 s, exhala 5 s */
+@keyframes breathe {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  40% {
+    transform: scale(1.32);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.32);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+}
+
+.breath-label {
+  color: var(--digit);
+  opacity: 0.5;
+  font-size: clamp(12px, 2vmin, 16px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.breath-time {
+  color: var(--digit);
+  opacity: 0.35;
+  font-size: clamp(14px, 2.6vmin, 20px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breath-circle {
+    animation: none;
+    opacity: 0.8;
+  }
 }
 
 /* ---------- Etiquetas de sesión ---------- */

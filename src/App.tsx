@@ -3,6 +3,7 @@ import FlipDigit from './components/FlipDigit';
 import {
   ClockIcon,
   CloseIcon,
+  ExpandIcon,
   GearIcon,
   PauseIcon,
   PlayIcon,
@@ -11,6 +12,7 @@ import {
 } from './components/Icons';
 import { useSound } from './hooks/useSound';
 import { useTimer } from './hooks/useTimer';
+import { useWakeLock } from './hooks/useWakeLock';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
 
@@ -18,16 +20,36 @@ interface Settings {
   alarmSound: boolean;
   flipSound: boolean;
   vibrate: boolean;
+  keepAwake: boolean;
+  notify: boolean;
 }
+
+const DEFAULT_SETTINGS: Settings = {
+  alarmSound: true,
+  flipSound: false,
+  vibrate: true,
+  keepAwake: true,
+  notify: false,
+};
 
 function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem('reloj:settings');
-    if (raw) return { alarmSound: true, flipSound: false, vibrate: true, ...JSON.parse(raw) };
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
     /* localStorage puede no estar disponible */
   }
-  return { alarmSound: true, flipSound: false, vibrate: true };
+  return DEFAULT_SETTINGS;
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    void document.exitFullscreen();
+  } else {
+    void document.documentElement.requestFullscreen().catch(() => {
+      /* algunos navegadores lo bloquean */
+    });
+  }
 }
 
 export default function App() {
@@ -42,7 +64,28 @@ export default function App() {
     if (settingsRef.current.vibrate && 'vibrate' in navigator) {
       navigator.vibrate([300, 120, 300, 120, 600]);
     }
+    if (
+      settingsRef.current.notify &&
+      'Notification' in window &&
+      Notification.permission === 'granted' &&
+      document.visibilityState !== 'visible'
+    ) {
+      new Notification('Tiempo terminado ⏱️', {
+        body: 'Tu temporizador llegó a 00:00.',
+        icon: '/icon.svg',
+      });
+    }
   });
+
+  useWakeLock(settings.keepAwake && status === 'running');
+
+  const enableNotify = async (on: boolean) => {
+    if (on && 'Notification' in window && Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+    }
+    setSettings((s) => ({ ...s, notify: on }));
+  };
 
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -124,6 +167,9 @@ export default function App() {
           </button>
           <button className="icon-btn" onClick={openPicker} aria-label="Elegir duración">
             <ClockIcon />
+          </button>
+          <button className="icon-btn" onClick={toggleFullscreen} aria-label="Pantalla completa">
+            <ExpandIcon />
           </button>
           <button className="icon-btn" onClick={() => setShowSettings(true)} aria-label="Ajustes">
             <GearIcon />
@@ -222,6 +268,22 @@ export default function App() {
                 type="checkbox"
                 checked={settings.vibrate}
                 onChange={(e) => setSettings((s) => ({ ...s, vibrate: e.target.checked }))}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>Mantener pantalla encendida</span>
+              <input
+                type="checkbox"
+                checked={settings.keepAwake}
+                onChange={(e) => setSettings((s) => ({ ...s, keepAwake: e.target.checked }))}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>Notificación al terminar</span>
+              <input
+                type="checkbox"
+                checked={settings.notify}
+                onChange={(e) => void enableNotify(e.target.checked)}
               />
             </label>
             <button className="sheet-primary" onClick={() => setShowSettings(false)}>

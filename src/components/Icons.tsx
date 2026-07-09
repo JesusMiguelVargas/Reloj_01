@@ -52,6 +52,14 @@ export function GearIcon() {
   );
 }
 
+export function ExpandIcon() {
+  return (
+    <svg viewBox="0 0 32 32" width="1em" height="1em" {...stroke}>
+      <path d="M12 6 H7 a1 1 0 0 0 -1 1 V12 M20 6 h5 a1 1 0 0 1 1 1 V12 M12 26 H7 a1 1 0 0 1 -1 -1 V20 M20 26 h5 a1 1 0 0 0 1 -1 V20" />
+    </svg>
+  );
+}
+
 export function PlayIcon() {
   return (
     <svg viewBox="0 0 32 32" width="1em" height="1em">

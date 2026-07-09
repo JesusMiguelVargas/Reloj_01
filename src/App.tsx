@@ -10,11 +10,21 @@ import {
   SoundOffIcon,
   SoundOnIcon,
 } from './components/Icons';
+import { useClock } from './hooks/useClock';
 import { useSound } from './hooks/useSound';
+import { useStopwatch } from './hooks/useStopwatch';
 import { useTimer } from './hooks/useTimer';
 import { useWakeLock } from './hooks/useWakeLock';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
+
+type Mode = 'clock' | 'timer' | 'stopwatch';
+
+const MODE_LABELS: Record<Mode, string> = {
+  clock: 'Reloj',
+  timer: 'Timer',
+  stopwatch: 'Crono',
+};
 
 interface Settings {
   alarmSound: boolean;
@@ -22,6 +32,7 @@ interface Settings {
   vibrate: boolean;
   keepAwake: boolean;
   notify: boolean;
+  hour12: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +41,7 @@ const DEFAULT_SETTINGS: Settings = {
   vibrate: true,
   keepAwake: true,
   notify: false,
+  hour12: false,
 };
 
 function loadSettings(): Settings {
@@ -42,6 +54,16 @@ function loadSettings(): Settings {
   return DEFAULT_SETTINGS;
 }
 
+function loadMode(): Mode {
+  try {
+    const raw = localStorage.getItem('reloj:mode');
+    if (raw === 'clock' || raw === 'timer' || raw === 'stopwatch') return raw;
+  } catch {
+    /* ignorar */
+  }
+  return 'timer';
+}
+
 function toggleFullscreen() {
   if (document.fullscreenElement) {
     void document.exitFullscreen();
@@ -52,14 +74,18 @@ function toggleFullscreen() {
   }
 }
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
 export default function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
+  const [mode, setMode] = useState<Mode>(loadMode);
+
   const { playFlick, playAlarm, unlock } = useSound();
 
-  const { remaining, duration, status, start, pause, reset } = useTimer(() => {
+  const timer = useTimer(() => {
     if (settingsRef.current.alarmSound) playAlarm();
     if (settingsRef.current.vibrate && 'vibrate' in navigator) {
       navigator.vibrate([300, 120, 300, 120, 600]);
@@ -77,15 +103,12 @@ export default function App() {
     }
   });
 
-  useWakeLock(settings.keepAwake && status === 'running');
+  const stopwatch = useStopwatch();
+  const clock = useClock(mode === 'clock', settings.hour12);
 
-  const enableNotify = async (on: boolean) => {
-    if (on && 'Notification' in window && Notification.permission !== 'granted') {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') return;
-    }
-    setSettings((s) => ({ ...s, notify: on }));
-  };
+  const isActive =
+    mode === 'clock' || timer.status === 'running' || (mode === 'stopwatch' && stopwatch.running);
+  useWakeLock(settings.keepAwake && isActive);
 
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -100,61 +123,100 @@ export default function App() {
     }
   }, [settings]);
 
-  // Sonido de solapa en cada segundo mientras corre.
-  const prevRemaining = useRef(remaining);
   useEffect(() => {
-    if (remaining !== prevRemaining.current) {
-      prevRemaining.current = remaining;
-      if (status === 'running' && settingsRef.current.flipSound) playFlick();
+    try {
+      localStorage.setItem('reloj:mode', mode);
+    } catch {
+      /* ignorar */
     }
-  }, [remaining, status, playFlick]);
+  }, [mode]);
 
-  // Título de la pestaña con el tiempo restante.
+  // Dígitos según el modo activo
+  let digits: string[];
+  if (mode === 'clock') {
+    digits = [clock.hh[0], clock.hh[1], clock.mm[0], clock.mm[1]];
+  } else if (mode === 'stopwatch') {
+    const mm = pad(Math.floor(stopwatch.elapsed / 60));
+    const ss = pad(stopwatch.elapsed % 60);
+    digits = [mm[0], mm[1], ss[0], ss[1]];
+  } else {
+    const mm = pad(Math.min(99, Math.floor(timer.remaining / 60)));
+    const ss = pad(timer.remaining % 60);
+    digits = [mm[0], mm[1], ss[0], ss[1]];
+  }
+
+  // Sonido de solapa cuando cambia cualquier dígito visible
+  const digitsKey = digits.join('');
+  const prevDigitsKey = useRef(digitsKey);
   useEffect(() => {
-    const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
-    const ss = String(remaining % 60).padStart(2, '0');
-    document.title =
-      status === 'running' || status === 'paused' ? `${mm}:${ss} — Temporizador` : 'Reloj — Temporizador Flip';
-  }, [remaining, status]);
+    if (digitsKey !== prevDigitsKey.current) {
+      prevDigitsKey.current = digitsKey;
+      if (settingsRef.current.flipSound) playFlick();
+    }
+  }, [digitsKey, playFlick]);
 
-  const minutes = String(Math.min(99, Math.floor(remaining / 60))).padStart(2, '0');
-  const seconds = String(remaining % 60).padStart(2, '0');
-  const digits = [minutes[0], minutes[1], seconds[0], seconds[1]];
+  // Título de la pestaña
+  useEffect(() => {
+    if (mode === 'timer' && (timer.status === 'running' || timer.status === 'paused')) {
+      document.title = `${digits[0]}${digits[1]}:${digits[2]}${digits[3]} — Temporizador`;
+    } else if (mode === 'stopwatch' && stopwatch.running) {
+      document.title = `${digits[0]}${digits[1]}:${digits[2]}${digits[3]} — Cronómetro`;
+    } else {
+      document.title = 'Reloj — Temporizador Flip';
+    }
+  }, [mode, timer.status, stopwatch.running, digits]);
 
-  const running = status === 'running';
-  const finished = status === 'finished';
+  const running = mode === 'timer' ? timer.status === 'running' : stopwatch.running;
+  const finished = mode === 'timer' && timer.status === 'finished';
 
   const handlePlayPause = () => {
     unlock();
-    if (running) {
-      pause();
-    } else if (finished) {
-      reset();
-    } else {
-      start();
+    if (mode === 'timer') {
+      if (timer.status === 'running') timer.pause();
+      else if (timer.status === 'finished') timer.reset();
+      else timer.start();
+    } else if (mode === 'stopwatch') {
+      if (stopwatch.running) stopwatch.pause();
+      else stopwatch.start();
     }
   };
 
   const handleClose = () => {
-    reset();
+    if (mode === 'timer') timer.reset();
+    else if (mode === 'stopwatch') stopwatch.reset();
   };
 
   const openPicker = () => {
-    setPickerMin(Math.floor(duration / 60));
-    setPickerSec(duration % 60);
+    setPickerMin(Math.floor(timer.duration / 60));
+    setPickerSec(timer.duration % 60);
     setShowPicker(true);
   };
 
   const applyPicker = (totalSeconds: number) => {
     const clamped = Math.max(1, Math.min(99 * 60 + 59, totalSeconds));
-    reset(clamped);
+    timer.reset(clamped);
     setShowPicker(false);
   };
+
+  const enableNotify = async (on: boolean) => {
+    if (on && 'Notification' in window && Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+    }
+    setSettings((s) => ({ ...s, notify: on }));
+  };
+
+  const controlsHidden = mode === 'clock';
 
   return (
     <div className={`app${finished ? ' finished' : ''}`}>
       <header className="topbar">
-        <button className="icon-btn close" onClick={handleClose} aria-label="Reiniciar">
+        <button
+          className="icon-btn close"
+          onClick={handleClose}
+          aria-label="Reiniciar"
+          style={{ visibility: controlsHidden ? 'hidden' : 'visible' }}
+        >
           <CloseIcon />
         </button>
         <div className="topbar-right">
@@ -165,9 +227,11 @@ export default function App() {
           >
             {settings.alarmSound ? <SoundOnIcon /> : <SoundOffIcon />}
           </button>
-          <button className="icon-btn" onClick={openPicker} aria-label="Elegir duración">
-            <ClockIcon />
-          </button>
+          {mode === 'timer' && (
+            <button className="icon-btn" onClick={openPicker} aria-label="Elegir duración">
+              <ClockIcon />
+            </button>
+          )}
           <button className="icon-btn" onClick={toggleFullscreen} aria-label="Pantalla completa">
             <ExpandIcon />
           </button>
@@ -177,17 +241,29 @@ export default function App() {
         </div>
       </header>
 
+      <nav className="modes" aria-label="Modo">
+        {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
+          <button
+            key={m}
+            className={`mode-btn${mode === m ? ' active' : ''}`}
+            onClick={() => setMode(m)}
+          >
+            {MODE_LABELS[m]}
+          </button>
+        ))}
+      </nav>
+
       <main
         className="clock"
         role="timer"
-        aria-label={`Quedan ${minutes} minutos con ${seconds} segundos`}
+        aria-label={`${digits[0]}${digits[1]} ${digits[2]}${digits[3]}`}
       >
         {digits.map((d, i) => (
           <FlipDigit key={i} value={d} />
         ))}
       </main>
 
-      <footer className="bottombar">
+      <footer className="bottombar" style={{ visibility: controlsHidden ? 'hidden' : 'visible' }}>
         <button
           className="play-btn"
           onClick={handlePlayPause}
@@ -205,7 +281,7 @@ export default function App() {
               {PRESETS.map((m) => (
                 <button
                   key={m}
-                  className={`preset${duration === m * 60 ? ' active' : ''}`}
+                  className={`preset${timer.duration === m * 60 ? ' active' : ''}`}
                   onClick={() => applyPicker(m * 60)}
                 >
                   {m} min
@@ -284,6 +360,14 @@ export default function App() {
                 type="checkbox"
                 checked={settings.notify}
                 onChange={(e) => void enableNotify(e.target.checked)}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>Formato de 12 horas</span>
+              <input
+                type="checkbox"
+                checked={settings.hour12}
+                onChange={(e) => setSettings((s) => ({ ...s, hour12: e.target.checked }))}
               />
             </label>
             <button className="sheet-primary" onClick={() => setShowSettings(false)}>

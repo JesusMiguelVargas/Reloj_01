@@ -83,6 +83,34 @@ body {
   opacity: 0.7;
 }
 
+/* ---------- Selector de modos ---------- */
+
+.modes {
+  display: flex;
+  justify-content: center;
+  gap: clamp(14px, 4vw, 34px);
+  padding: 2px 0 6px;
+}
+
+.mode-btn {
+  background: none;
+  border: none;
+  color: var(--digit);
+  opacity: 0.32;
+  font-family: inherit;
+  font-size: clamp(11px, 1.7vmin, 14px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 6px 2px;
+  transition: opacity 0.2s ease;
+}
+
+.mode-btn.active {
+  opacity: 1;
+}
+
 /* ---------- Reloj ---------- */
 
 .clock {

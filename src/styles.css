@@ -15,8 +15,10 @@
   --sheet-muted: #9a9aa2;
   --radius: clamp(10px, 2.2vmin, 22px);
 
-  /* Vertical: 2 columnas x 2 filas (minutos arriba, segundos abajo) */
-  --card-w: min(42vw, 21.5vh);
+  /* Vertical: 2 columnas x 2 filas (minutos arriba, segundos abajo).
+     El tope en vh reserva espacio para barra superior, modos, indicador
+     pomodoro y botón de play, para que nada quede fuera de pantalla. */
+  --card-w: min(42vw, 19vh);
   --card-h: calc(var(--card-w) * 1.92);
   --gap: clamp(8px, 1.8vmin, 18px);
 }
@@ -162,8 +164,16 @@ body {
 
 /* ---------- Reloj ---------- */
 
+.topbar,
+.modes,
+.pomo-status,
+.bottombar {
+  flex-shrink: 0; /* los controles nunca ceden su espacio al reloj */
+}
+
 .clock {
   flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, var(--card-w));
   grid-auto-rows: var(--card-h);

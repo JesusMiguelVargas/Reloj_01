@@ -135,7 +135,7 @@ export default function App() {
     ) {
       new Notification('Tiempo terminado ⏱️', {
         body: 'Tu temporizador llegó a 00:00.',
-        icon: '/icon.svg',
+        icon: `${import.meta.env.BASE_URL}icon.svg`,
       });
     }
   });
@@ -160,7 +160,7 @@ export default function App() {
       ) {
         new Notification(next === 'focus' ? 'A concentrarse 🍅' : 'Descanso ☕', {
           body: `Empieza: ${PHASE_LABELS[next].toLowerCase()}.`,
-          icon: '/icon.svg',
+          icon: `${import.meta.env.BASE_URL}icon.svg`,
         });
       }
     },

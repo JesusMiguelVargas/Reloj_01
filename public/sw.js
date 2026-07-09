@@ -29,7 +29,8 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request, { ignoreSearch: true });
         if (cached) return cached;
         if (request.mode === 'navigate') {
-          const index = await cache.match('/', { ignoreSearch: true });
+          // El alcance del SW es la raíz de la app (en GitHub Pages, /<repo>/)
+          const index = await cache.match(self.registration.scope, { ignoreSearch: true });
           if (index) return index;
         }
         throw err;

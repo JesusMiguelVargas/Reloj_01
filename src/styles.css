@@ -250,6 +250,66 @@ body {
   }
 }
 
+/* ---------- Indicador pomodoro ---------- */
+
+.pomo-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.pomo-dots {
+  display: flex;
+  gap: 10px;
+}
+
+.pomo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--digit);
+  opacity: 0.22;
+}
+
+.pomo-dot.done {
+  opacity: 1;
+}
+
+.pomo-dot.current {
+  opacity: 0.65;
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.pomo-phase {
+  color: var(--digit);
+  opacity: 0.4;
+  font-size: clamp(10px, 1.5vmin, 13px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@media (orientation: landscape) {
+  /* En horizontal, el indicador flota bajo el reloj sin empujar el layout */
+  .pomo-status {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 48px));
+    z-index: 4;
+    pointer-events: none;
+    padding: 0;
+  }
+}
+
 /* ---------- Estado terminado ---------- */
 
 .app.finished .clock {
@@ -428,6 +488,47 @@ body {
   font-size: 17px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.sheet-subtitle {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a9aa2;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.pomo-config {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.pomo-config label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pomo-config input {
+  width: 72px;
+  background: #2a2a31;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomo-config span {
+  color: #9a9aa2;
+  font-size: 13px;
 }
 
 .toggle-row {

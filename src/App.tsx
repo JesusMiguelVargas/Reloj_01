@@ -11,6 +11,7 @@ import {
   SoundOnIcon,
 } from './components/Icons';
 import { useClock } from './hooks/useClock';
+import { DEFAULT_POMODORO, usePomodoro, type PomodoroConfig } from './hooks/usePomodoro';
 import { useSound } from './hooks/useSound';
 import { useStopwatch } from './hooks/useStopwatch';
 import { useTimer } from './hooks/useTimer';
@@ -18,13 +19,20 @@ import { useWakeLock } from './hooks/useWakeLock';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
 
-type Mode = 'clock' | 'timer' | 'stopwatch';
+type Mode = 'clock' | 'timer' | 'stopwatch' | 'pomodoro';
 
 const MODE_LABELS: Record<Mode, string> = {
   clock: 'Reloj',
   timer: 'Timer',
   stopwatch: 'Crono',
+  pomodoro: 'Pomo',
 };
+
+const PHASE_LABELS = {
+  focus: 'Foco',
+  break: 'Descanso',
+  longBreak: 'Descanso largo',
+} as const;
 
 interface Settings {
   alarmSound: boolean;
@@ -33,6 +41,7 @@ interface Settings {
   keepAwake: boolean;
   notify: boolean;
   hour12: boolean;
+  pomodoro: PomodoroConfig;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -42,12 +51,20 @@ const DEFAULT_SETTINGS: Settings = {
   keepAwake: true,
   notify: false,
   hour12: false,
+  pomodoro: DEFAULT_POMODORO,
 };
 
 function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem('reloj:settings');
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        pomodoro: { ...DEFAULT_POMODORO, ...(parsed.pomodoro ?? {}) },
+      };
+    }
   } catch {
     /* localStorage puede no estar disponible */
   }
@@ -57,7 +74,7 @@ function loadSettings(): Settings {
 function loadMode(): Mode {
   try {
     const raw = localStorage.getItem('reloj:mode');
-    if (raw === 'clock' || raw === 'timer' || raw === 'stopwatch') return raw;
+    if (raw === 'clock' || raw === 'timer' || raw === 'stopwatch' || raw === 'pomodoro') return raw;
   } catch {
     /* ignorar */
   }
@@ -83,7 +100,7 @@ export default function App() {
 
   const [mode, setMode] = useState<Mode>(loadMode);
 
-  const { playFlick, playAlarm, unlock } = useSound();
+  const { playFlick, playAlarm, playChime, unlock } = useSound();
 
   const timer = useTimer(() => {
     if (settingsRef.current.alarmSound) playAlarm();
@@ -106,8 +123,31 @@ export default function App() {
   const stopwatch = useStopwatch();
   const clock = useClock(mode === 'clock', settings.hour12);
 
+  const pomodoro = usePomodoro(settings.pomodoro, {
+    onPhaseEnd: (_ended, next) => {
+      if (settingsRef.current.alarmSound) playChime();
+      if (settingsRef.current.vibrate && 'vibrate' in navigator) {
+        navigator.vibrate(next === 'focus' ? [200] : [200, 100, 200]);
+      }
+      if (
+        settingsRef.current.notify &&
+        'Notification' in window &&
+        Notification.permission === 'granted' &&
+        document.visibilityState !== 'visible'
+      ) {
+        new Notification(next === 'focus' ? 'A concentrarse 🍅' : 'Descanso ☕', {
+          body: `Empieza: ${PHASE_LABELS[next].toLowerCase()}.`,
+          icon: '/icon.svg',
+        });
+      }
+    },
+  });
+
   const isActive =
-    mode === 'clock' || timer.status === 'running' || (mode === 'stopwatch' && stopwatch.running);
+    mode === 'clock' ||
+    timer.status === 'running' ||
+    (mode === 'stopwatch' && stopwatch.running) ||
+    (mode === 'pomodoro' && pomodoro.running);
   useWakeLock(settings.keepAwake && isActive);
 
   const [showPicker, setShowPicker] = useState(false);
@@ -140,8 +180,9 @@ export default function App() {
     const ss = pad(stopwatch.elapsed % 60);
     digits = [mm[0], mm[1], ss[0], ss[1]];
   } else {
-    const mm = pad(Math.min(99, Math.floor(timer.remaining / 60)));
-    const ss = pad(timer.remaining % 60);
+    const secondsLeft = mode === 'pomodoro' ? pomodoro.remaining : timer.remaining;
+    const mm = pad(Math.min(99, Math.floor(secondsLeft / 60)));
+    const ss = pad(secondsLeft % 60);
     digits = [mm[0], mm[1], ss[0], ss[1]];
   }
 
@@ -161,12 +202,19 @@ export default function App() {
       document.title = `${digits[0]}${digits[1]}:${digits[2]}${digits[3]} — Temporizador`;
     } else if (mode === 'stopwatch' && stopwatch.running) {
       document.title = `${digits[0]}${digits[1]}:${digits[2]}${digits[3]} — Cronómetro`;
+    } else if (mode === 'pomodoro' && pomodoro.running) {
+      document.title = `${digits[0]}${digits[1]}:${digits[2]}${digits[3]} — ${PHASE_LABELS[pomodoro.phase]}`;
     } else {
       document.title = 'Reloj — Temporizador Flip';
     }
-  }, [mode, timer.status, stopwatch.running, digits]);
+  }, [mode, timer.status, stopwatch.running, pomodoro.running, pomodoro.phase, digits]);
 
-  const running = mode === 'timer' ? timer.status === 'running' : stopwatch.running;
+  const running =
+    mode === 'timer'
+      ? timer.status === 'running'
+      : mode === 'pomodoro'
+        ? pomodoro.running
+        : stopwatch.running;
   const finished = mode === 'timer' && timer.status === 'finished';
 
   const handlePlayPause = () => {
@@ -178,12 +226,16 @@ export default function App() {
     } else if (mode === 'stopwatch') {
       if (stopwatch.running) stopwatch.pause();
       else stopwatch.start();
+    } else if (mode === 'pomodoro') {
+      if (pomodoro.running) pomodoro.pause();
+      else pomodoro.start();
     }
   };
 
   const handleClose = () => {
     if (mode === 'timer') timer.reset();
     else if (mode === 'stopwatch') stopwatch.reset();
+    else if (mode === 'pomodoro') pomodoro.reset();
   };
 
   const openPicker = () => {
@@ -262,6 +314,26 @@ export default function App() {
           <FlipDigit key={i} value={d} />
         ))}
       </main>
+
+      {mode === 'pomodoro' && (
+        <div className="pomo-status" aria-label={PHASE_LABELS[pomodoro.phase]}>
+          <div className="pomo-dots">
+            {Array.from({ length: settings.pomodoro.cyclesBeforeLongBreak }, (_, i) => (
+              <span
+                key={i}
+                className={`pomo-dot${
+                  i < pomodoro.cycle
+                    ? ' done'
+                    : i === pomodoro.cycle && pomodoro.phase === 'focus'
+                      ? ' current'
+                      : ''
+                }`}
+              />
+            ))}
+          </div>
+          <span className="pomo-phase">{PHASE_LABELS[pomodoro.phase]}</span>
+        </div>
+      )}
 
       <footer className="bottombar" style={{ visibility: controlsHidden ? 'hidden' : 'visible' }}>
         <button
@@ -370,6 +442,36 @@ export default function App() {
                 onChange={(e) => setSettings((s) => ({ ...s, hour12: e.target.checked }))}
               />
             </label>
+
+            <h3 className="sheet-subtitle">Pomodoro (minutos)</h3>
+            <div className="pomo-config">
+              {(
+                [
+                  ['focusMin', 'Foco'],
+                  ['breakMin', 'Descanso'],
+                  ['longBreakMin', 'Largo'],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={settings.pomodoro[key]}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        pomodoro: {
+                          ...s.pomodoro,
+                          [key]: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                        },
+                      }))
+                    }
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
             <button className="sheet-primary" onClick={() => setShowSettings(false)}>
               Listo
             </button>

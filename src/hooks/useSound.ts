@@ -59,10 +59,29 @@ export function useSound() {
     }
   }, [getCtx]);
 
+  /** Aviso suave de cambio de fase (pomodoro): dos notas ascendentes. */
+  const playChime = useCallback(() => {
+    const ctx = getCtx();
+    const t0 = ctx.currentTime;
+    [660, 880].forEach((freq, i) => {
+      const t = t0 + i * 0.18;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    });
+  }, [getCtx]);
+
   /** Los navegadores exigen un gesto del usuario antes de reproducir audio. */
   const unlock = useCallback(() => {
     void getCtx();
   }, [getCtx]);
 
-  return { playFlick, playAlarm, unlock };
+  return { playFlick, playAlarm, playChime, unlock };
 }

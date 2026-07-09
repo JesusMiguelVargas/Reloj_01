@@ -8,6 +8,7 @@ import {
   todayStats,
   yearGrid,
 } from '../stats';
+import { shareSummary } from '../shareCard';
 
 const DAY_LETTERS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
@@ -108,6 +109,14 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
           </>
         )}
 
+        <button
+          className="sheet-secondary"
+          onClick={() =>
+            void shareSummary({ streak: racha, todaySeconds: today.seconds, count: today.count })
+          }
+        >
+          Compartir resumen del día
+        </button>
         <button className="sheet-secondary" onClick={downloadCSV}>
           Exportar CSV
         </button>

@@ -44,6 +44,25 @@ tarjetas clásicos.
 - ⏲️ Cuentas exactas basadas en marca de tiempo (sin deriva aunque la pestaña pierda foco).
 - ♿ Respeta `prefers-reduced-motion`.
 
+## Funciones premium
+
+- 🔔 **Campanada horaria** en modo reloj (el "dong" clásico, sintetizado).
+- 🂠 **3 estilos de volteo** (suave, mecánico con rebote, directo) y 3 velocidades.
+- 🌙 **Atenuación nocturna automática** (21:00–07:00) para la mesita de noche.
+- 🔤 **3 tipografías de dígito** (redonda, mono, serif) y **color de acento personalizado**
+  con ajuste automático de contraste.
+- 📊 **Panel de insights**: heatmap anual, barras semanales, racha de días, mejor hora,
+  desglose por etiqueta y exportación a CSV.
+- 🏷️ **Etiquetas de sesión** (Estudio / Trabajo / Lectura / Otro) de un tap.
+- 🎯 **Meta diaria** de foco con anillo de progreso alrededor del botón de play.
+- 🎚️ **Mezclador de ambiente**: capas de lluvia, ruido marrón y tic-tac con volumen
+  independiente y fundido de entrada/salida.
+- 🫁 **Respiración guiada** en los descansos del pomodoro (círculo que respira).
+- 📤 **Tarjeta compartible**: imagen del resumen del día con estética flip clock
+  (Web Share o descarga PNG).
+- ⚡ **Lanzadores rápidos por URL**: `?timer=10`, `?timer=12:30&auto=1`,
+  `?mode=reloj|timer|crono|pomo` — ideales para atajos del teléfono.
+
 ## Stack tecnológico
 
 - [Vite](https://vitejs.dev/) — servidor de desarrollo y build.

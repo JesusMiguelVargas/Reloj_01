@@ -251,6 +251,37 @@ export default function App() {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
 
+  // Lanzadores rápidos por URL: ?mode=reloj|timer|crono|pomo, ?timer=10 ó
+  // ?timer=10:30, y ?auto=1 para arrancar al abrir. Permiten crear atajos.
+  const launchedRef = useRef(false);
+  useEffect(() => {
+    if (launchedRef.current) return;
+    launchedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get('mode');
+    const modeMap: Record<string, Mode> = {
+      reloj: 'clock',
+      clock: 'clock',
+      timer: 'timer',
+      crono: 'stopwatch',
+      pomo: 'pomodoro',
+      pomodoro: 'pomodoro',
+    };
+    if (modeParam && modeMap[modeParam]) setMode(modeMap[modeParam]);
+
+    const timerParam = params.get('timer');
+    if (timerParam) {
+      const [minStr, secStr] = timerParam.split(':');
+      const total = (Number(minStr) || 0) * 60 + (Number(secStr) || 0);
+      if (total > 0) {
+        setMode('timer');
+        timer.reset(Math.min(99 * 60 + 59, total));
+        if (params.get('auto') === '1') timer.start();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Acento personalizado: se ajusta solo para que contraste con la tarjeta.
   useEffect(() => {
     if (settings.accent) {

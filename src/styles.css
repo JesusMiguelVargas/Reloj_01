@@ -1,0 +1,418 @@
+:root {
+  --bg: #000000;
+  --card: #141416;
+  --card-top: #17171a;
+  --digit: #c9c9ce;
+  --hinge: #000000;
+  --pill: #26263a;
+  --icon: #ffffff;
+  --radius: clamp(10px, 2.2vmin, 22px);
+
+  /* Vertical: 2 columnas x 2 filas (minutos arriba, segundos abajo) */
+  --card-w: min(42vw, 21.5vh);
+  --card-h: calc(var(--card-w) * 1.92);
+  --gap: clamp(8px, 1.8vmin, 18px);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--icon);
+  font-family:
+    'SF Pro Rounded',
+    ui-rounded,
+    'Arial Rounded MT Bold',
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+/* ---------- Barra superior ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+}
+
+.topbar-right {
+  display: flex;
+  gap: clamp(18px, 5vw, 44px);
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--icon);
+  font-size: clamp(24px, 3.4vmin, 32px);
+  line-height: 0;
+  cursor: pointer;
+  padding: 4px;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+  opacity: 0.7;
+}
+
+/* ---------- Reloj ---------- */
+
+.clock {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, var(--card-w));
+  grid-auto-rows: var(--card-h);
+  gap: var(--gap);
+  place-content: center;
+}
+
+@media (orientation: landscape) {
+  :root {
+    --card-w: min(20.5vw, 36vh);
+  }
+
+  .clock {
+    grid-template-columns: repeat(4, var(--card-w));
+  }
+}
+
+/* ---------- Tarjeta flip ---------- */
+
+.flip-card {
+  position: relative;
+  width: var(--card-w);
+  height: var(--card-h);
+  font-size: calc(var(--card-w) * 1.28);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--digit);
+  perspective: calc(var(--card-h) * 7);
+}
+
+.half,
+.flap {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.half span,
+.flap span {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.half.top,
+.flap-top {
+  top: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--card-top);
+}
+
+.half.bottom,
+.flap-bottom {
+  top: 50%;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.half.top span,
+.flap-top span {
+  top: 0;
+}
+
+.half.bottom span,
+.flap-bottom span {
+  bottom: 0;
+}
+
+/* Línea de bisagra al centro */
+.hinge {
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--hinge);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* ---------- Animación de volteo ---------- */
+
+.flap-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  transform-style: preserve-3d;
+}
+
+.flap {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* La solapa superior (valor viejo) cae hacia adelante… */
+.flap-top {
+  transform-origin: center bottom;
+  animation: fold 0.31s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+/* …y la inferior (valor nuevo) termina la caída. */
+.flap-bottom {
+  transform-origin: center top;
+  transform: rotateX(90deg);
+  animation: unfold 0.31s cubic-bezier(0.22, 0.61, 0.36, 1) 0.31s forwards;
+}
+
+@keyframes fold {
+  from {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+  to {
+    transform: rotateX(-90deg);
+    filter: brightness(0.55);
+  }
+}
+
+@keyframes unfold {
+  from {
+    transform: rotateX(90deg);
+    filter: brightness(0.55);
+  }
+  to {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+
+/* ---------- Estado terminado ---------- */
+
+.app.finished .clock {
+  animation: flash 1s ease-in-out infinite;
+}
+
+@keyframes flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Botón de reproducción ---------- */
+
+.bottombar {
+  display: flex;
+  justify-content: center;
+  padding: clamp(6px, 2vmin, 16px) 0;
+}
+
+.play-btn {
+  background: var(--pill);
+  border: none;
+  color: #e8e8f2;
+  width: clamp(96px, 22vmin, 200px);
+  height: clamp(48px, 11vmin, 96px);
+  border-radius: 999px;
+  font-size: clamp(22px, 5vmin, 40px);
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.play-btn:active {
+  transform: scale(0.94);
+  filter: brightness(1.3);
+}
+
+@media (orientation: landscape) {
+  /* En horizontal el botón flota sobre el reloj, como en iOS */
+  .bottombar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    z-index: 5;
+  }
+}
+
+/* ---------- Hojas modales (duración y ajustes) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+}
+
+@media (orientation: landscape) {
+  .sheet-backdrop {
+    align-items: center;
+  }
+}
+
+.sheet {
+  background: #1b1b20;
+  border-radius: 22px 22px 0 0;
+  padding: 24px 22px calc(24px + env(safe-area-inset-bottom));
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: slide-up 0.25s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@media (orientation: landscape) {
+  .sheet {
+    border-radius: 22px;
+    padding-bottom: 24px;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.sheet h2 {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.preset {
+  background: #2a2a31;
+  border: none;
+  color: #d6d6dc;
+  border-radius: 12px;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.preset.active {
+  background: #4a4aff;
+  color: #fff;
+}
+
+.custom-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.custom-time label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.custom-time input {
+  width: 76px;
+  background: #2a2a31;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.custom-time span {
+  color: #9a9aa2;
+  font-size: 14px;
+}
+
+.custom-time .colon {
+  font-size: 26px;
+  font-weight: 700;
+  color: #d6d6dc;
+}
+
+.sheet-primary {
+  background: #4a4aff;
+  border: none;
+  color: #fff;
+  border-radius: 14px;
+  padding: 14px 0;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  color: #d6d6dc;
+  padding: 6px 2px;
+}
+
+.toggle-row input {
+  width: 22px;
+  height: 22px;
+  accent-color: #4a4aff;
+}

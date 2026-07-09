@@ -17,6 +17,7 @@ import { useSound } from './hooks/useSound';
 import { useStopwatch } from './hooks/useStopwatch';
 import { useTimer } from './hooks/useTimer';
 import { useWakeLock } from './hooks/useWakeLock';
+import { ensureContrast } from './color';
 import { formatFocusTime, recordSession, todayStats } from './stats';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
@@ -56,6 +57,12 @@ interface Settings {
   theme: Theme;
   ambient: Ambient;
   pomodoro: PomodoroConfig;
+  flipStyle: 'suave' | 'mecanico' | 'instantaneo';
+  flipSpeed: 'lenta' | 'normal' | 'rapida';
+  digitFont: 'redondeada' | 'mono' | 'serif';
+  nightDim: boolean;
+  hourlyChime: boolean;
+  accent: string | null;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -68,7 +75,33 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'negro',
   ambient: 'none',
   pomodoro: DEFAULT_POMODORO,
+  flipStyle: 'suave',
+  flipSpeed: 'normal',
+  digitFont: 'redondeada',
+  nightDim: false,
+  hourlyChime: false,
+  accent: null,
 };
+
+const FLIP_HALF_MS = { lenta: 460, normal: 310, rapida: 200 } as const;
+
+const FLIP_STYLES = [
+  ['suave', 'Suave'],
+  ['mecanico', 'Mecánico'],
+  ['instantaneo', 'Directo'],
+] as const;
+
+const FLIP_SPEEDS = [
+  ['lenta', 'Lenta'],
+  ['normal', 'Normal'],
+  ['rapida', 'Rápida'],
+] as const;
+
+const DIGIT_FONTS = [
+  ['redondeada', 'Redonda'],
+  ['mono', 'Mono'],
+  ['serif', 'Serif'],
+] as const;
 
 function loadSettings(): Settings {
   try {
@@ -116,7 +149,7 @@ export default function App() {
 
   const [mode, setMode] = useState<Mode>(loadMode);
 
-  const { playFlick, playAlarm, playChime, unlock } = useSound();
+  const { playFlick, playAlarm, playChime, playDong, unlock } = useSound();
   const { start: startAmbient, stop: stopAmbient } = useAmbient();
   const [stats, setStats] = useState(todayStats);
   const timerDurationRef = useRef(0);
@@ -143,7 +176,9 @@ export default function App() {
   timerDurationRef.current = timer.duration;
 
   const stopwatch = useStopwatch();
-  const clock = useClock(mode === 'clock', settings.hour12);
+  const clock = useClock(mode === 'clock', settings.hour12, () => {
+    if (settingsRef.current.hourlyChime) playDong();
+  });
 
   const pomodoro = usePomodoro(settings.pomodoro, {
     onPhaseEnd: (ended, next, focusSeconds) => {
@@ -198,6 +233,44 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
+
+  // Acento personalizado: se ajusta solo para que contraste con la tarjeta.
+  useEffect(() => {
+    if (settings.accent) {
+      const themeCard = THEMES.find((t) => t.id === settings.theme)?.card ?? '#17171a';
+      document.documentElement.style.setProperty(
+        '--digit',
+        ensureContrast(settings.accent, themeCard)
+      );
+    } else {
+      document.documentElement.style.removeProperty('--digit');
+    }
+  }, [settings.accent, settings.theme]);
+
+  // Atenuación nocturna: dígitos tenues de 21:00 a 07:00.
+  const [night, setNight] = useState(false);
+  useEffect(() => {
+    if (!settings.nightDim) {
+      setNight(false);
+      return;
+    }
+    const check = () => {
+      const h = new Date().getHours();
+      setNight(h >= 21 || h < 7);
+    };
+    check();
+    const id = window.setInterval(check, 60_000);
+    return () => window.clearInterval(id);
+  }, [settings.nightDim]);
+
+  // Duración real del volteo según estilo y velocidad (para FlipDigit).
+  const flipHalf = FLIP_HALF_MS[settings.flipSpeed];
+  const flipDurationMs =
+    settings.flipStyle === 'instantaneo'
+      ? 60
+      : settings.flipStyle === 'mecanico'
+        ? Math.round(flipHalf * 2.7) + 60
+        : flipHalf * 2 + 60;
 
   // ----- Gestos sobre las tarjetas -----
   // deslizar vertical (timer detenido) = ajustar minutos
@@ -379,7 +452,12 @@ export default function App() {
   const controlsHidden = mode === 'clock';
 
   return (
-    <div className={`app${finished ? ' finished' : ''}`}>
+    <div
+      className={`app${finished ? ' finished' : ''}${night ? ' night' : ''}`}
+      data-flip-style={settings.flipStyle}
+      data-flip-speed={settings.flipSpeed}
+      data-font={settings.digitFont}
+    >
       <header className="topbar">
         <button
           className="icon-btn close"
@@ -438,7 +516,7 @@ export default function App() {
         style={{ transform: `translate(${drift.x}px, ${drift.y}px)`, transition: 'transform 2s ease' }}
       >
         {digits.map((d, i) => (
-          <FlipDigit key={i} value={d} />
+          <FlipDigit key={i} value={d} durationMs={flipDurationMs} />
         ))}
       </main>
 
@@ -544,6 +622,17 @@ export default function App() {
                 onChange={(e) => setSettings((s) => ({ ...s, flipSound: e.target.checked }))}
               />
             </label>
+            <label className="toggle-row">
+              <span>Campanada cada hora (modo reloj)</span>
+              <input
+                type="checkbox"
+                checked={settings.hourlyChime}
+                onChange={(e) => {
+                  unlock();
+                  setSettings((s) => ({ ...s, hourlyChime: e.target.checked }));
+                }}
+              />
+            </label>
             <h3 className="sheet-subtitle">Ambiente mientras corre</h3>
             <div className="presets ambient-grid">
               {(Object.keys(AMBIENT_LABELS) as Ambient[]).map((a) => (
@@ -587,6 +676,71 @@ export default function App() {
               ))}
             </div>
 
+            <div className="accent-row">
+              <span>Color de dígitos</span>
+              <div className="accent-controls">
+                <input
+                  type="color"
+                  value={settings.accent ?? THEMES.find((t) => t.id === settings.theme)!.digit}
+                  onChange={(e) => setSettings((s) => ({ ...s, accent: e.target.value }))}
+                  aria-label="Color de dígitos"
+                />
+                {settings.accent && (
+                  <button
+                    className="accent-reset"
+                    onClick={() => setSettings((s) => ({ ...s, accent: null }))}
+                  >
+                    Restablecer
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <h3 className="sheet-subtitle">Volteo</h3>
+            <div className="presets chips3">
+              {FLIP_STYLES.map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`preset${settings.flipStyle === id ? ' active' : ''}`}
+                  onClick={() => setSettings((s) => ({ ...s, flipStyle: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="presets chips3">
+              {FLIP_SPEEDS.map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`preset${settings.flipSpeed === id ? ' active' : ''}`}
+                  onClick={() => setSettings((s) => ({ ...s, flipSpeed: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <h3 className="sheet-subtitle">Tipografía</h3>
+            <div className="presets chips3">
+              {DIGIT_FONTS.map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`preset${settings.digitFont === id ? ' active' : ''}`}
+                  onClick={() => setSettings((s) => ({ ...s, digitFont: id }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <label className="toggle-row">
+              <span>Atenuación nocturna (21:00–07:00)</span>
+              <input
+                type="checkbox"
+                checked={settings.nightDim}
+                onChange={(e) => setSettings((s) => ({ ...s, nightDim: e.target.checked }))}
+              />
+            </label>
             <label className="toggle-row">
               <span>Vibración al terminar</span>
               <input

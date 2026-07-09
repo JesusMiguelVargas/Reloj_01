@@ -12,9 +12,13 @@ import { useEffect, useRef, useState } from 'react';
  * Cuando la animación termina, la mitad inferior estática pasa a mostrar
  * el valor nuevo y las solapas desaparecen.
  */
-const FLIP_MS = 620;
+interface Props {
+  value: string;
+  /** Duración total del volteo en ms (según estilo y velocidad elegidos). */
+  durationMs?: number;
+}
 
-export default function FlipDigit({ value }: { value: string }) {
+export default function FlipDigit({ value, durationMs = 620 }: Props) {
   const prevRef = useRef(value);
   const [, rerender] = useState(0);
 
@@ -26,10 +30,10 @@ export default function FlipDigit({ value }: { value: string }) {
       const t = window.setTimeout(() => {
         prevRef.current = value;
         rerender((n) => n + 1);
-      }, FLIP_MS);
+      }, durationMs);
       return () => window.clearTimeout(t);
     }
-  }, [value]);
+  }, [value, durationMs]);
 
   return (
     <div className="flip-card" aria-hidden="true">

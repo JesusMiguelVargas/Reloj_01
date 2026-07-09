@@ -83,10 +83,35 @@ export function useSound() {
     });
   }, [getCtx]);
 
+  /**
+   * Campanada horaria: el "dong" grave y resonante de un reloj de pared,
+   * con su armónico. Suena dos veces.
+   */
+  const playDong = useCallback(() => {
+    const ctx = getCtx();
+    const t0 = ctx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const t = t0 + i * 1.1;
+      [220, 440, 661].forEach((freq, h) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        const gain = ctx.createGain();
+        const peak = h === 0 ? 0.3 : h === 1 ? 0.12 : 0.05;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(peak, t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 1.05);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 1.1);
+      });
+    }
+  }, [getCtx]);
+
   /** Los navegadores exigen un gesto del usuario antes de reproducir audio. */
   const unlock = useCallback(() => {
     void getCtx();
   }, [getCtx]);
 
-  return { playFlick, playAlarm, playChime, unlock };
+  return { playFlick, playAlarm, playChime, playDong, unlock };
 }

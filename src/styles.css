@@ -102,6 +102,73 @@ body {
   flex-direction: column;
   padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
     max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  --flip-half: 0.31s; /* medio volteo; el total es el doble */
+}
+
+/* ---------- Velocidad y estilo del volteo ---------- */
+
+.app[data-flip-speed='lenta'] {
+  --flip-half: 0.46s;
+}
+
+.app[data-flip-speed='rapida'] {
+  --flip-half: 0.2s;
+}
+
+/* Mecánico: el nuevo dígito cae con un rebote de resorte */
+.app[data-flip-style='mecanico'] .flap-bottom {
+  animation-name: unfold-bounce;
+  animation-duration: calc(var(--flip-half) * 1.7);
+  animation-timing-function: linear;
+}
+
+@keyframes unfold-bounce {
+  0% {
+    transform: rotateX(90deg);
+    filter: brightness(0.55);
+  }
+  55% {
+    transform: rotateX(-10deg);
+    filter: brightness(1);
+  }
+  75% {
+    transform: rotateX(6deg);
+  }
+  90% {
+    transform: rotateX(-2deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+
+/* Instantáneo: sin solapas, el número simplemente cambia */
+.app[data-flip-style='instantaneo'] .flap-stage {
+  display: none;
+}
+
+/* ---------- Tipografías de dígito ---------- */
+
+.app[data-font='mono'] .flip-card {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, 'Roboto Mono', monospace;
+}
+
+.app[data-font='serif'] .flip-card {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* ---------- Atenuación nocturna ---------- */
+
+.app.night .clock {
+  filter: brightness(0.55);
+}
+
+.app.night .topbar,
+.app.night .modes,
+.app.night .bottombar,
+.app.night .pomo-status {
+  opacity: 0.55;
 }
 
 /* ---------- Barra superior ---------- */
@@ -280,14 +347,14 @@ body {
 /* La solapa superior (valor viejo) cae hacia adelante… */
 .flap-top {
   transform-origin: center bottom;
-  animation: fold 0.31s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+  animation: fold var(--flip-half) cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
 /* …y la inferior (valor nuevo) termina la caída. */
 .flap-bottom {
   transform-origin: center top;
   transform: rotateX(90deg);
-  animation: unfold 0.31s cubic-bezier(0.22, 0.61, 0.36, 1) 0.31s forwards;
+  animation: unfold var(--flip-half) cubic-bezier(0.22, 0.61, 0.36, 1) var(--flip-half) forwards;
 }
 
 @keyframes fold {
@@ -504,6 +571,8 @@ body {
 .sheet {
   background: var(--sheet-bg);
   color: var(--sheet-text);
+  max-height: 88dvh;
+  overflow-y: auto;
   border-radius: 22px 22px 0 0;
   padding: 24px 22px calc(24px + env(safe-area-inset-bottom));
   width: min(100%, 440px);
@@ -696,6 +765,46 @@ body {
   width: 100%;
   height: 1px;
   background: rgba(0, 0, 0, 0.45);
+}
+
+.chips3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.accent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  color: var(--sheet-text);
+  padding: 2px 2px;
+}
+
+.accent-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.accent-row input[type='color'] {
+  width: 44px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: var(--sheet-card);
+  padding: 2px;
+  cursor: pointer;
+}
+
+.accent-reset {
+  background: var(--sheet-card);
+  border: none;
+  color: var(--sheet-muted);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .toggle-row {

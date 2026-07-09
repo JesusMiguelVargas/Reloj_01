@@ -3,15 +3,63 @@
   --card: #141416;
   --card-top: #17171a;
   --digit: #c9c9ce;
+  --digit-glow: none;
   --hinge: #000000;
   --pill: #26263a;
+  --pill-icon: #e8e8f2;
   --icon: #ffffff;
+  --accent: #4a4aff;
+  --sheet-bg: #1b1b20;
+  --sheet-card: #2a2a31;
+  --sheet-text: #d6d6dc;
+  --sheet-muted: #9a9aa2;
   --radius: clamp(10px, 2.2vmin, 22px);
 
   /* Vertical: 2 columnas x 2 filas (minutos arriba, segundos abajo) */
   --card-w: min(42vw, 21.5vh);
   --card-h: calc(var(--card-w) * 1.92);
   --gap: clamp(8px, 1.8vmin, 18px);
+}
+
+/* Marfil: papel cálido, modo día */
+:root[data-theme='marfil'] {
+  --bg: #e8e4dc;
+  --card: #f6f3ec;
+  --card-top: #fbf9f4;
+  --digit: #2e2c28;
+  --hinge: #d5d0c5;
+  --pill: #d9d4c9;
+  --pill-icon: #2e2c28;
+  --icon: #2e2c28;
+  --accent: #b3541e;
+  --sheet-bg: #f3efe7;
+  --sheet-card: #e2ddd2;
+  --sheet-text: #2e2c28;
+  --sheet-muted: #8a8478;
+}
+
+/* Terminal: fósforo verde sobre negro */
+:root[data-theme='terminal'] {
+  --card: #0a120d;
+  --card-top: #0d1710;
+  --digit: #3fd97f;
+  --digit-glow: 0 0 18px rgba(63, 217, 127, 0.35);
+  --pill: #10331f;
+  --pill-icon: #3fd97f;
+  --icon: #3fd97f;
+  --accent: #23a35c;
+}
+
+/* Rojo medianoche: dígitos rojos tenues para la mesita de noche */
+:root[data-theme='rojo'] {
+  --card: #120a0a;
+  --card-top: #170d0d;
+  --digit: #c24141;
+  --digit-glow: 0 0 16px rgba(194, 65, 65, 0.25);
+  --pill: #2e1212;
+  --pill-icon: #c24141;
+  --icon: #c24141;
+  --accent: #a33232;
 }
 
 * {
@@ -28,6 +76,7 @@ body,
 
 body {
   background: var(--bg);
+  transition: background 0.3s ease;
   color: var(--icon);
   font-family:
     'SF Pro Rounded',
@@ -120,6 +169,8 @@ body {
   grid-auto-rows: var(--card-h);
   gap: var(--gap);
   place-content: center;
+  touch-action: none; /* los gestos (deslizar/doble tap) los maneja la app */
+  cursor: default;
 }
 
 @media (orientation: landscape) {
@@ -142,6 +193,7 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--digit);
+  text-shadow: var(--digit-glow);
   perspective: calc(var(--card-h) * 7);
 }
 
@@ -337,7 +389,7 @@ body {
 .play-btn {
   background: var(--pill);
   border: none;
-  color: #e8e8f2;
+  color: var(--pill-icon);
   width: clamp(96px, 22vmin, 200px);
   height: clamp(48px, 11vmin, 96px);
   border-radius: 999px;
@@ -386,7 +438,8 @@ body {
 }
 
 .sheet {
-  background: #1b1b20;
+  background: var(--sheet-bg);
+  color: var(--sheet-text);
   border-radius: 22px 22px 0 0;
   padding: 24px 22px calc(24px + env(safe-area-inset-bottom));
   width: min(100%, 440px);
@@ -427,9 +480,9 @@ body {
 }
 
 .preset {
-  background: #2a2a31;
+  background: var(--sheet-card);
   border: none;
-  color: #d6d6dc;
+  color: var(--sheet-text);
   border-radius: 12px;
   padding: 12px 0;
   font-size: 15px;
@@ -438,7 +491,7 @@ body {
 }
 
 .preset.active {
-  background: #4a4aff;
+  background: var(--accent);
   color: #fff;
 }
 
@@ -457,10 +510,10 @@ body {
 
 .custom-time input {
   width: 76px;
-  background: #2a2a31;
+  background: var(--sheet-card);
   border: none;
   border-radius: 12px;
-  color: #fff;
+  color: var(--sheet-text);
   font-size: 26px;
   font-weight: 700;
   text-align: center;
@@ -469,18 +522,18 @@ body {
 }
 
 .custom-time span {
-  color: #9a9aa2;
+  color: var(--sheet-muted);
   font-size: 14px;
 }
 
 .custom-time .colon {
   font-size: 26px;
   font-weight: 700;
-  color: #d6d6dc;
+  color: var(--sheet-text);
 }
 
 .sheet-primary {
-  background: #4a4aff;
+  background: var(--accent);
   border: none;
   color: #fff;
   border-radius: 14px;
@@ -495,7 +548,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #9a9aa2;
+  color: var(--sheet-muted);
   text-align: center;
   margin-top: 4px;
 }
@@ -515,10 +568,10 @@ body {
 
 .pomo-config input {
   width: 72px;
-  background: #2a2a31;
+  background: var(--sheet-card);
   border: none;
   border-radius: 12px;
-  color: #fff;
+  color: var(--sheet-text);
   font-size: 22px;
   font-weight: 700;
   text-align: center;
@@ -527,8 +580,58 @@ body {
 }
 
 .pomo-config span {
-  color: #9a9aa2;
+  color: var(--sheet-muted);
   font-size: 13px;
+}
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.theme-btn {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--sheet-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.theme-btn.active {
+  border-color: var(--accent);
+  color: var(--sheet-text);
+}
+
+.theme-swatch {
+  width: 44px;
+  height: 56px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-swatch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .toggle-row {
@@ -536,12 +639,12 @@ body {
   align-items: center;
   justify-content: space-between;
   font-size: 16px;
-  color: #d6d6dc;
+  color: var(--sheet-text);
   padding: 6px 2px;
 }
 
 .toggle-row input {
   width: 22px;
   height: 22px;
-  accent-color: #4a4aff;
+  accent-color: var(--accent);
 }

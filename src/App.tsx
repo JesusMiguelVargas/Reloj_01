@@ -34,6 +34,16 @@ const PHASE_LABELS = {
   longBreak: 'Descanso largo',
 } as const;
 
+type Theme = 'negro' | 'marfil' | 'terminal' | 'rojo';
+
+/** Colores de las muestras del selector (espejo de los temas en CSS). */
+const THEMES: { id: Theme; name: string; card: string; digit: string }[] = [
+  { id: 'negro', name: 'Negro', card: '#17171a', digit: '#c9c9ce' },
+  { id: 'marfil', name: 'Marfil', card: '#f6f3ec', digit: '#2e2c28' },
+  { id: 'terminal', name: 'Terminal', card: '#0d1710', digit: '#3fd97f' },
+  { id: 'rojo', name: 'Rojo', card: '#170d0d', digit: '#c24141' },
+];
+
 interface Settings {
   alarmSound: boolean;
   flipSound: boolean;
@@ -41,6 +51,7 @@ interface Settings {
   keepAwake: boolean;
   notify: boolean;
   hour12: boolean;
+  theme: Theme;
   pomodoro: PomodoroConfig;
 }
 
@@ -51,6 +62,7 @@ const DEFAULT_SETTINGS: Settings = {
   keepAwake: true,
   notify: false,
   hour12: false,
+  theme: 'negro',
   pomodoro: DEFAULT_POMODORO,
 };
 
@@ -171,6 +183,77 @@ export default function App() {
     }
   }, [mode]);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
+
+  // ----- Gestos sobre las tarjetas -----
+  // deslizar vertical (timer detenido) = ajustar minutos
+  // doble tap = pantalla completa | mantener presionado = reiniciar
+  const gestureRef = useRef({
+    active: false,
+    startY: 0,
+    startX: 0,
+    moved: false,
+    steps: 0,
+    baseDuration: 0,
+    longPressTimer: 0,
+    longPressFired: false,
+    lastTap: 0,
+  });
+
+  const onClockPointerDown = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    g.active = true;
+    g.startX = e.clientX;
+    g.startY = e.clientY;
+    g.moved = false;
+    g.steps = 0;
+    g.baseDuration = timer.duration;
+    g.longPressFired = false;
+    g.longPressTimer = window.setTimeout(() => {
+      if (!g.moved && mode !== 'clock') {
+        g.longPressFired = true;
+        handleCloseRef.current();
+        if ('vibrate' in navigator) navigator.vibrate(60);
+      }
+    }, 600);
+  };
+
+  const onClockPointerMove = (e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    const dy = e.clientY - g.startY;
+    const dx = e.clientX - g.startX;
+    if (!g.moved && Math.hypot(dx, dy) > 12) {
+      g.moved = true;
+      window.clearTimeout(g.longPressTimer);
+    }
+    if (g.moved && mode === 'timer' && timer.status !== 'running') {
+      const steps = Math.trunc(-dy / 26); // arrastrar hacia arriba suma minutos
+      if (steps !== g.steps) {
+        g.steps = steps;
+        const next = Math.max(60, Math.min(99 * 60 + 59, g.baseDuration + steps * 60));
+        timer.reset(next);
+      }
+    }
+  };
+
+  const onClockPointerUp = () => {
+    const g = gestureRef.current;
+    if (!g.active) return;
+    g.active = false;
+    window.clearTimeout(g.longPressTimer);
+    if (g.longPressFired || g.moved) return;
+    const now = Date.now();
+    if (now - g.lastTap < 300) {
+      g.lastTap = 0;
+      toggleFullscreen();
+    } else {
+      g.lastTap = now;
+    }
+  };
+
   // Dígitos según el modo activo
   let digits: string[];
   if (mode === 'clock') {
@@ -237,6 +320,8 @@ export default function App() {
     else if (mode === 'stopwatch') stopwatch.reset();
     else if (mode === 'pomodoro') pomodoro.reset();
   };
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
 
   const openPicker = () => {
     setPickerMin(Math.floor(timer.duration / 60));
@@ -309,6 +394,10 @@ export default function App() {
         className="clock"
         role="timer"
         aria-label={`${digits[0]}${digits[1]} ${digits[2]}${digits[3]}`}
+        onPointerDown={onClockPointerDown}
+        onPointerMove={onClockPointerMove}
+        onPointerUp={onClockPointerUp}
+        onPointerCancel={onClockPointerUp}
       >
         {digits.map((d, i) => (
           <FlipDigit key={i} value={d} />
@@ -394,6 +483,23 @@ export default function App() {
         <div className="sheet-backdrop" onClick={() => setShowSettings(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <h2>Ajustes</h2>
+
+            <h3 className="sheet-subtitle">Tema</h3>
+            <div className="themes">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  className={`theme-btn${settings.theme === t.id ? ' active' : ''}`}
+                  onClick={() => setSettings((s) => ({ ...s, theme: t.id }))}
+                >
+                  <span className="theme-swatch" style={{ background: t.card, color: t.digit }}>
+                    5
+                  </span>
+                  <span>{t.name}</span>
+                </button>
+              ))}
+            </div>
+
             <label className="toggle-row">
               <span>Alarma al terminar</span>
               <input

@@ -17,7 +17,11 @@ export function useSound() {
     return ctxRef.current;
   }, []);
 
-  /** Clic corto y seco, como la solapa de un reloj de tarjetas. */
+  /**
+   * Clic corto y seco, como la solapa de un reloj de tarjetas. El tono y el
+   * volumen varían un poco en cada golpe: los mecanismos reales nunca
+   * suenan igual dos veces.
+   */
   const playFlick = useCallback(() => {
     const ctx = getCtx();
     const t = ctx.currentTime;
@@ -28,12 +32,13 @@ export function useSound() {
     }
     const src = ctx.createBufferSource();
     src.buffer = buffer;
+    src.playbackRate.value = 0.92 + Math.random() * 0.16;
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 2400;
+    filter.frequency.value = 2100 + Math.random() * 700;
     filter.Q.value = 1.2;
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.setValueAtTime(0.14 + Math.random() * 0.08, t);
     src.connect(filter).connect(gain).connect(ctx.destination);
     src.start(t);
   }, [getCtx]);

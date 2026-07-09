@@ -362,10 +362,48 @@ body {
   }
 }
 
+/* ---------- Estadística mínima ---------- */
+
+.stats-line {
+  text-align: center;
+  color: var(--digit);
+  opacity: 0.35;
+  font-size: clamp(11px, 1.7vmin, 14px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 8px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (orientation: landscape) {
+  /* En horizontal no hay sitio: el reloj manda */
+  .stats-line {
+    display: none;
+  }
+}
+
+.ambient-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* ---------- Estado terminado ---------- */
 
-.app.finished .clock {
-  animation: flash 1s ease-in-out infinite;
+/* Parpadeo en cascada: cada tarjeta pulsa con un pequeño retardo,
+   como una ola que recorre el reloj. */
+.app.finished .flip-card {
+  animation: flash 1.2s ease-in-out infinite;
+}
+
+.app.finished .flip-card:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.app.finished .flip-card:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.app.finished .flip-card:nth-child(4) {
+  animation-delay: 0.36s;
 }
 
 @keyframes flash {
@@ -375,6 +413,22 @@ body {
   }
   50% {
     opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flap-top,
+  .flap-bottom {
+    animation-duration: 0.01s;
+  }
+
+  .flap-bottom {
+    animation-delay: 0.01s;
+  }
+
+  .app.finished .flip-card {
+    animation: none;
+    opacity: 0.6;
   }
 }
 

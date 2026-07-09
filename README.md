@@ -1,19 +1,48 @@
 # Reloj — Temporizador Flip ⏱️
 
-Aplicación móvil (web, mobile-first) de temporizador con diseño **minimalista tipo flip clock**:
-cada dígito es una tarjeta dividida en dos mitades y, al cambiar de número, la hoja superior
-cae hacia adelante con una animación 3D, igual que los relojes de tarjetas clásicos.
+Aplicación móvil (web, mobile-first, instalable como PWA) con diseño **minimalista tipo
+flip clock**: cada dígito es una tarjeta dividida en dos mitades y, al cambiar de número,
+la hoja superior cae hacia adelante con una animación 3D, igual que los relojes de
+tarjetas clásicos.
 
-## Características
+## Modos
 
-- 🂠 **Animación de volteo (split-flap)** con CSS 3D real: la hoja baja, se oscurece al girar y el nuevo número termina la caída.
-- 📱 **Vertical y horizontal**: en vertical los dígitos se ordenan en 2×2 (minutos arriba, segundos abajo); en horizontal en una fila de 4.
-- ▶️ Botón de iniciar/pausar tipo píldora.
-- ✕ Botón para reiniciar el temporizador.
-- 🕐 Selector de duración con presets (1, 3, 5, 10, 15, 25, 45, 60 min) y tiempo personalizado hasta 99:59.
-- 🔊 Alarma al terminar (WebAudio, sin archivos), sonido opcional de solapa en cada segundo y vibración (en móviles compatibles).
-- 🌙 Tema oscuro puro, pensado para dejar el teléfono como reloj de mesa.
-- ⏲️ Cuenta atrás sin deriva (basada en marca de tiempo, exacta aunque la pestaña pierda foco).
+- ⏱️ **Timer** — cuenta atrás con presets (1–60 min) y tiempo personalizado hasta 99:59.
+- 🕐 **Reloj** — reloj de mesa con la hora actual (12/24 h); deja el teléfono apoyado y listo.
+- ⏰ **Crono** — cronómetro con flip hacia arriba.
+- 🍅 **Pomo** — pomodoro con ciclos foco/descanso/descanso largo configurables,
+  transición automática de fases con aviso sonoro e indicador de puntos.
+
+## Diseño y animación
+
+- 🂠 **Animación split-flap** con CSS 3D real: la hoja baja, se oscurece al girar y el
+  nuevo número termina la caída. Al terminar la cuenta, las tarjetas parpadean en cascada.
+- 📱 **Vertical y horizontal**: 2×2 en vertical (minutos arriba, segundos abajo); fila de 4 en horizontal.
+- 🎨 **4 temas-material**: Negro, Marfil (día), Terminal (fósforo verde) y Rojo medianoche.
+- 🔅 **Anti burn-in**: el reloj se desplaza unos píxeles de vez en cuando para cuidar pantallas OLED.
+
+## Gestos
+
+- **Desliza arriba/abajo** sobre las tarjetas (timer detenido) para ajustar los minutos.
+- **Doble tap** para pantalla completa.
+- **Mantén presionado** para reiniciar.
+
+## Sonido (WebAudio, sin archivos)
+
+- Alarma de pitidos al terminar y campanadas suaves entre fases pomodoro.
+- "Clac" opcional de solapa en cada segundo, con tono que varía en cada golpe.
+- **Ambiente mientras corre**: lluvia, ruido marrón o tic-tac mecánico, sintetizados en vivo.
+- Vibración al terminar (en móviles compatibles).
+
+## App completa
+
+- 📲 **PWA instalable**: manifest + service worker; funciona sin conexión y se añade a la
+  pantalla de inicio a pantalla completa.
+- 🔆 **Wake Lock**: mantiene la pantalla encendida mientras corre (o en modo reloj).
+- 🔔 **Notificación web** al terminar si la pestaña está en segundo plano.
+- 📈 **Estadística mínima**: "Hoy: N sesiones · Xh Ym" (timer y pomodoro), guardada en el navegador.
+- ⏲️ Cuentas exactas basadas en marca de tiempo (sin deriva aunque la pestaña pierda foco).
+- ♿ Respeta `prefers-reduced-motion`.
 
 ## Stack tecnológico
 

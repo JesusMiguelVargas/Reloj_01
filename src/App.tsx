@@ -10,12 +10,14 @@ import {
   SoundOffIcon,
   SoundOnIcon,
 } from './components/Icons';
+import { AMBIENT_LABELS, useAmbient, type Ambient } from './hooks/useAmbient';
 import { useClock } from './hooks/useClock';
 import { DEFAULT_POMODORO, usePomodoro, type PomodoroConfig } from './hooks/usePomodoro';
 import { useSound } from './hooks/useSound';
 import { useStopwatch } from './hooks/useStopwatch';
 import { useTimer } from './hooks/useTimer';
 import { useWakeLock } from './hooks/useWakeLock';
+import { formatFocusTime, recordSession, todayStats } from './stats';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
 
@@ -52,6 +54,7 @@ interface Settings {
   notify: boolean;
   hour12: boolean;
   theme: Theme;
+  ambient: Ambient;
   pomodoro: PomodoroConfig;
 }
 
@@ -63,6 +66,7 @@ const DEFAULT_SETTINGS: Settings = {
   notify: false,
   hour12: false,
   theme: 'negro',
+  ambient: 'none',
   pomodoro: DEFAULT_POMODORO,
 };
 
@@ -113,8 +117,12 @@ export default function App() {
   const [mode, setMode] = useState<Mode>(loadMode);
 
   const { playFlick, playAlarm, playChime, unlock } = useSound();
+  const { start: startAmbient, stop: stopAmbient } = useAmbient();
+  const [stats, setStats] = useState(todayStats);
+  const timerDurationRef = useRef(0);
 
   const timer = useTimer(() => {
+    setStats(recordSession(timerDurationRef.current));
     if (settingsRef.current.alarmSound) playAlarm();
     if (settingsRef.current.vibrate && 'vibrate' in navigator) {
       navigator.vibrate([300, 120, 300, 120, 600]);
@@ -132,11 +140,14 @@ export default function App() {
     }
   });
 
+  timerDurationRef.current = timer.duration;
+
   const stopwatch = useStopwatch();
   const clock = useClock(mode === 'clock', settings.hour12);
 
   const pomodoro = usePomodoro(settings.pomodoro, {
-    onPhaseEnd: (_ended, next) => {
+    onPhaseEnd: (ended, next, focusSeconds) => {
+      if (ended === 'focus') setStats(recordSession(focusSeconds));
       if (settingsRef.current.alarmSound) playChime();
       if (settingsRef.current.vibrate && 'vibrate' in navigator) {
         navigator.vibrate(next === 'focus' ? [200] : [200, 100, 200]);
@@ -164,6 +175,7 @@ export default function App() {
 
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSound, setShowSound] = useState(false);
   const [pickerMin, setPickerMin] = useState(5);
   const [pickerSec, setPickerSec] = useState(0);
 
@@ -300,6 +312,27 @@ export default function App() {
         : stopwatch.running;
   const finished = mode === 'timer' && timer.status === 'finished';
 
+  // Sonido ambiente: solo mientras corre la cuenta.
+  useEffect(() => {
+    if (running && settings.ambient !== 'none') {
+      startAmbient(settings.ambient);
+    } else {
+      stopAmbient();
+    }
+  }, [running, settings.ambient, startAmbient, stopAmbient]);
+
+  // Anti burn-in: desplaza el reloj unos píxeles de vez en cuando.
+  const [drift, setDrift] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setDrift({
+        x: Math.round(Math.random() * 12 - 6),
+        y: Math.round(Math.random() * 12 - 6),
+      });
+    }, 50_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const handlePlayPause = () => {
     unlock();
     if (mode === 'timer') {
@@ -359,10 +392,14 @@ export default function App() {
         <div className="topbar-right">
           <button
             className="icon-btn"
-            onClick={() => setSettings((s) => ({ ...s, alarmSound: !s.alarmSound }))}
-            aria-label={settings.alarmSound ? 'Silenciar alarma' : 'Activar alarma'}
+            onClick={() => setShowSound(true)}
+            aria-label="Sonido"
           >
-            {settings.alarmSound ? <SoundOnIcon /> : <SoundOffIcon />}
+            {settings.alarmSound || settings.ambient !== 'none' ? (
+              <SoundOnIcon />
+            ) : (
+              <SoundOffIcon />
+            )}
           </button>
           {mode === 'timer' && (
             <button className="icon-btn" onClick={openPicker} aria-label="Elegir duración">
@@ -398,6 +435,7 @@ export default function App() {
         onPointerMove={onClockPointerMove}
         onPointerUp={onClockPointerUp}
         onPointerCancel={onClockPointerUp}
+        style={{ transform: `translate(${drift.x}px, ${drift.y}px)`, transition: 'transform 2s ease' }}
       >
         {digits.map((d, i) => (
           <FlipDigit key={i} value={d} />
@@ -422,6 +460,13 @@ export default function App() {
           </div>
           <span className="pomo-phase">{PHASE_LABELS[pomodoro.phase]}</span>
         </div>
+      )}
+
+      {(mode === 'timer' || mode === 'pomodoro') && !running && stats.count > 0 && (
+        <p className="stats-line">
+          Hoy: {stats.count} {stats.count === 1 ? 'sesión' : 'sesiones'} ·{' '}
+          {formatFocusTime(stats.seconds)}
+        </p>
       )}
 
       <footer className="bottombar" style={{ visibility: controlsHidden ? 'hidden' : 'visible' }}>
@@ -479,6 +524,48 @@ export default function App() {
         </div>
       )}
 
+      {showSound && (
+        <div className="sheet-backdrop" onClick={() => setShowSound(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <h2>Sonido</h2>
+            <label className="toggle-row">
+              <span>Alarma al terminar</span>
+              <input
+                type="checkbox"
+                checked={settings.alarmSound}
+                onChange={(e) => setSettings((s) => ({ ...s, alarmSound: e.target.checked }))}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>Sonido de solapa (clac)</span>
+              <input
+                type="checkbox"
+                checked={settings.flipSound}
+                onChange={(e) => setSettings((s) => ({ ...s, flipSound: e.target.checked }))}
+              />
+            </label>
+            <h3 className="sheet-subtitle">Ambiente mientras corre</h3>
+            <div className="presets ambient-grid">
+              {(Object.keys(AMBIENT_LABELS) as Ambient[]).map((a) => (
+                <button
+                  key={a}
+                  className={`preset${settings.ambient === a ? ' active' : ''}`}
+                  onClick={() => {
+                    unlock();
+                    setSettings((s) => ({ ...s, ambient: a }));
+                  }}
+                >
+                  {AMBIENT_LABELS[a]}
+                </button>
+              ))}
+            </div>
+            <button className="sheet-primary" onClick={() => setShowSound(false)}>
+              Listo
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSettings && (
         <div className="sheet-backdrop" onClick={() => setShowSettings(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -500,22 +587,6 @@ export default function App() {
               ))}
             </div>
 
-            <label className="toggle-row">
-              <span>Alarma al terminar</span>
-              <input
-                type="checkbox"
-                checked={settings.alarmSound}
-                onChange={(e) => setSettings((s) => ({ ...s, alarmSound: e.target.checked }))}
-              />
-            </label>
-            <label className="toggle-row">
-              <span>Sonido de solapa (tic)</span>
-              <input
-                type="checkbox"
-                checked={settings.flipSound}
-                onChange={(e) => setSettings((s) => ({ ...s, flipSound: e.target.checked }))}
-              />
-            </label>
             <label className="toggle-row">
               <span>Vibración al terminar</span>
               <input

@@ -18,7 +18,8 @@ import { useStopwatch } from './hooks/useStopwatch';
 import { useTimer } from './hooks/useTimer';
 import { useWakeLock } from './hooks/useWakeLock';
 import { ensureContrast } from './color';
-import { formatFocusTime, recordSession, todayStats } from './stats';
+import InsightsSheet from './components/InsightsSheet';
+import { TAGS, formatFocusTime, recordSession, todayStats } from './stats';
 
 const PRESETS = [1, 3, 5, 10, 15, 25, 45, 60];
 
@@ -63,6 +64,8 @@ interface Settings {
   nightDim: boolean;
   hourlyChime: boolean;
   accent: string | null;
+  dailyGoalMin: number;
+  defaultTag: string;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -81,6 +84,8 @@ const DEFAULT_SETTINGS: Settings = {
   nightDim: false,
   hourlyChime: false,
   accent: null,
+  dailyGoalMin: 0,
+  defaultTag: 'Trabajo',
 };
 
 const FLIP_HALF_MS = { lenta: 460, normal: 310, rapida: 200 } as const;
@@ -155,7 +160,7 @@ export default function App() {
   const timerDurationRef = useRef(0);
 
   const timer = useTimer(() => {
-    setStats(recordSession(timerDurationRef.current));
+    setStats(recordSession(timerDurationRef.current, settingsRef.current.defaultTag));
     if (settingsRef.current.alarmSound) playAlarm();
     if (settingsRef.current.vibrate && 'vibrate' in navigator) {
       navigator.vibrate([300, 120, 300, 120, 600]);
@@ -182,7 +187,9 @@ export default function App() {
 
   const pomodoro = usePomodoro(settings.pomodoro, {
     onPhaseEnd: (ended, next, focusSeconds) => {
-      if (ended === 'focus') setStats(recordSession(focusSeconds));
+      if (ended === 'focus') {
+        setStats(recordSession(focusSeconds, settingsRef.current.defaultTag));
+      }
       if (settingsRef.current.alarmSound) playChime();
       if (settingsRef.current.vibrate && 'vibrate' in navigator) {
         navigator.vibrate(next === 'focus' ? [200] : [200, 100, 200]);
@@ -211,6 +218,7 @@ export default function App() {
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSound, setShowSound] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
   const [pickerMin, setPickerMin] = useState(5);
   const [pickerSec, setPickerSec] = useState(0);
 
@@ -540,21 +548,56 @@ export default function App() {
         </div>
       )}
 
-      {(mode === 'timer' || mode === 'pomodoro') && !running && stats.count > 0 && (
-        <p className="stats-line">
-          Hoy: {stats.count} {stats.count === 1 ? 'sesión' : 'sesiones'} ·{' '}
-          {formatFocusTime(stats.seconds)}
-        </p>
+      {(mode === 'timer' || mode === 'pomodoro') && !running && (
+        <>
+          <div className="tag-chips" aria-label="Etiqueta de la sesión">
+            {TAGS.map((t) => (
+              <button
+                key={t}
+                className={`tag-chip${settings.defaultTag === t ? ' active' : ''}`}
+                onClick={() => setSettings((s) => ({ ...s, defaultTag: t }))}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {stats.count > 0 && (
+            <button className="stats-line" onClick={() => setShowInsights(true)}>
+              Hoy: {stats.count} {stats.count === 1 ? 'sesión' : 'sesiones'} ·{' '}
+              {formatFocusTime(stats.seconds)}
+            </button>
+          )}
+        </>
       )}
 
       <footer className="bottombar" style={{ visibility: controlsHidden ? 'hidden' : 'visible' }}>
-        <button
-          className="play-btn"
-          onClick={handlePlayPause}
-          aria-label={running ? 'Pausar' : 'Iniciar'}
-        >
-          {running ? <PauseIcon /> : <PlayIcon />}
-        </button>
+        <div className="play-wrap">
+          {settings.dailyGoalMin > 0 && (mode === 'timer' || mode === 'pomodoro') && (
+            <svg className="goal-ring" viewBox="0 0 100 60" preserveAspectRatio="none">
+              <rect className="ring-track" x="2" y="2" width="96" height="56" rx="28" />
+              <rect
+                className="ring-fill"
+                x="2"
+                y="2"
+                width="96"
+                height="56"
+                rx="28"
+                pathLength={100}
+                strokeDasharray="100"
+                strokeDashoffset={
+                  100 - Math.min(100, (stats.seconds / (settings.dailyGoalMin * 60)) * 100)
+                }
+              />
+            </svg>
+          )}
+          <button
+            className="play-btn"
+            onClick={handlePlayPause}
+            aria-label={running ? 'Pausar' : 'Iniciar'}
+          >
+            {running ? <PauseIcon /> : <PlayIcon />}
+          </button>
+        </div>
       </footer>
 
       {showPicker && (
@@ -774,6 +817,33 @@ export default function App() {
               />
             </label>
 
+            <div className="accent-row">
+              <span>Meta diaria de foco (min, 0 = sin meta)</span>
+              <input
+                className="goal-input"
+                type="number"
+                min={0}
+                max={960}
+                value={settings.dailyGoalMin}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    dailyGoalMin: Math.max(0, Math.min(960, Number(e.target.value) || 0)),
+                  }))
+                }
+              />
+            </div>
+
+            <button
+              className="sheet-secondary"
+              onClick={() => {
+                setShowSettings(false);
+                setShowInsights(true);
+              }}
+            >
+              Ver estadísticas
+            </button>
+
             <h3 className="sheet-subtitle">Pomodoro (minutos)</h3>
             <div className="pomo-config">
               {(
@@ -809,6 +879,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {showInsights && <InsightsSheet onClose={() => setShowInsights(false)} />}
     </div>
   );
 }
